@@ -16,7 +16,11 @@ class CallAnalytics extends StatefulWidget {
   State<CallAnalytics> createState() => _CallAnalyticsState();
 }
 
-class _CallAnalyticsState extends State<CallAnalytics> {
+class _CallAnalyticsState extends State<CallAnalytics>
+    with TickerProviderStateMixin {
+  late TabController _tabController;
+  final List<String> tabTitles = ['Summary-Enquiry', 'Summary-Cold Calls'];
+
   String selectedTimeRange = '1D';
   int selectedTabIndex = 0;
   int touchedIndex = -1;
@@ -24,11 +28,29 @@ class _CallAnalyticsState extends State<CallAnalytics> {
 
   bool _isLoading = true;
   Map<String, dynamic>? _dashboardData;
+  Map<String, dynamic>? _enquiryData;
+  Map<String, dynamic>? _coldCallData;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: tabTitles.length, vsync: this);
+    _tabController.addListener(() {
+      if (_tabController.indexIsChanging == false) {
+        setState(() {
+          selectedTabIndex = _tabController.index;
+          // Refresh data when tab changes
+          _fetchDashboardData();
+        });
+      }
+    });
     _fetchDashboardData();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchDashboardData() async {
@@ -43,17 +65,36 @@ class _CallAnalyticsState extends State<CallAnalytics> {
       String periodParam = '';
       switch (_childButtonIndex) {
         case 1:
-          periodParam = '?type=QTD';
+          periodParam = '?type=Day';
           break;
         case 2:
+          periodParam = '?type=Week';
+          break;
+        case 3:
+          periodParam = '?type=MTD';
+          break;
+        case 4:
+          periodParam = '?type=QTD';
+          break;
+        case 5:
           periodParam = '?type=YTD';
           break;
         default:
-          periodParam = '?type=MTD';
+          periodParam = '?type=Day';
       }
 
+      // Add tab parameter to differentiate between "Summary-Enquiry" and "Summary-Cold Calls"
+      String tabParam =
+          selectedTabIndex == 0 ? '&tab=enquiry' : '&tab=coldcall';
+
+      // If periodParam already contains a query parameter, append tabParam with &, otherwise use ?
+      final separator = periodParam.contains('?') ? '&' : '?';
+      final fullParams = periodParam.isEmpty
+          ? '?tab=${selectedTabIndex == 0 ? "enquiry" : "coldcall"}'
+          : periodParam + tabParam;
+
       final uri = Uri.parse(
-          'https://dev.smartassistapp.in/api/users/dashboard/analytics$periodParam');
+          'https://dev.smartassistapp.in/api/users/dashboard/analytics$fullParams');
 
       final response = await http.get(
         uri,
@@ -65,12 +106,21 @@ class _CallAnalyticsState extends State<CallAnalytics> {
 
       print(uri);
       print(response.body);
+
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
         // Check if the widget is still in the widget tree before calling setState
         if (mounted) {
           setState(() {
             _dashboardData = jsonData['data'];
+
+            // Store data based on the selected tab
+            if (selectedTabIndex == 0) {
+              _enquiryData = jsonData['data'];
+            } else {
+              _coldCallData = jsonData['data'];
+            }
+
             _isLoading = false;
           });
         }
@@ -98,29 +148,29 @@ class _CallAnalyticsState extends State<CallAnalytics> {
     }
   }
 
-  final List<String> tabTitles = ['Summary-Enquiry', 'Summary-Cold Calls'];
-
   void _updateSelectedTimeRange(String range) {
     setState(() {
       selectedTimeRange = range;
+      // Fetch data when time range changes
+      _fetchDashboardData();
     });
   }
 
   void _updateSelectedTab(int index) {
     setState(() {
       selectedTabIndex = index;
+      _tabController.animateTo(index);
+      // No need to fetch data here as the tab controller listener will handle it
     });
   }
 
-  // Get current data based on selected period
+  // Get current data based on selected tab and period
   Map<String, dynamic> get performanceCount {
     if (_dashboardData == null) {
       // Return empty data if API data isn't available yet
       return {};
     }
     return _dashboardData!['performance'] ?? {};
-    // return _dashboardData!['dealerShipRank'] ??
-    //     {}; // Fixed key from 'dealershipRank' to 'dealerShipRank'
   }
 
   Map<String, dynamic> get currentAllIndiaRank {
@@ -128,8 +178,6 @@ class _CallAnalyticsState extends State<CallAnalytics> {
       // Return empty data if API data isn't available yet
       return {};
     }
-
-    // Using allIndiaRank from API response - fixed key from 'allINDRank' to 'allIndiaRank'
     return _dashboardData!['allIndiaRank'] ?? {};
   }
 
@@ -138,12 +186,8 @@ class _CallAnalyticsState extends State<CallAnalytics> {
       // Return empty data if API data isn't available yet
       return {};
     }
-
-    // Using allIndiaRank from API response - fixed key from 'allINDRank' to 'allIndiaRank'
     return _dashboardData!['allIndiaBestPerformace'] ?? {};
   }
-
-  //new code remove us unused
 
   Map<String, dynamic> get dealershipRank {
     if (_dashboardData == null) {
@@ -152,7 +196,7 @@ class _CallAnalyticsState extends State<CallAnalytics> {
     return _dashboardData!['dealerShipRank'] ?? {};
   }
 
-  // Generate dynamic table rows based on API data
+  // Generate dynamic table rows based on API data and selected tab
   List<List<String>> get tableData {
     final List<List<String>> data = [];
 
@@ -160,41 +204,65 @@ class _CallAnalyticsState extends State<CallAnalytics> {
       return [];
     }
 
-    // Add Enquiries row
-    data.add([
-      'All Calls',
-      performanceCount['enquiry']?.toString() ?? '0', //performance
-      allIndiaBestPerformace['enquiriesCount']?.toString() ??
-          '0', //allIndiaRank
-      dealershipRank['enquiriesRank']?.toString() ?? '0', //
-    ]);
+    if (selectedTabIndex == 0) {
+      // Enquiry data
+      data.add([
+        'All Calls',
+        performanceCount['enquiry']?.toString() ?? '0',
+        allIndiaBestPerformace['enquiriesCount']?.toString() ?? '0',
+        dealershipRank['enquiriesRank']?.toString() ?? '0',
+      ]);
 
-    // Add Lost Enquiries row
-    data.add([
-      'Connected',
-      performanceCount['lostEnq']?.toString() ?? '0', //performance
-      allIndiaBestPerformace['lostEnquiriesCount']?.toString() ??
-          '0', //allIndiaRank
-      dealershipRank['lostEnquiriesRank']?.toString() ?? '0', //
-    ]);
+      data.add([
+        'Connected',
+        performanceCount['lostEnq']?.toString() ?? '0',
+        allIndiaBestPerformace['lostEnquiriesCount']?.toString() ?? '0',
+        dealershipRank['lostEnquiriesRank']?.toString() ?? '0',
+      ]);
 
-    // Add Test drives row
-    data.add([
-      'Missed',
-      performanceCount['testDriveData']?.toString() ?? '0', //performance
-      allIndiaBestPerformace['testDrivesCount']?.toString() ??
-          '0', //allIndiaRank
-      dealershipRank['testDrivesRank']?.toString() ?? '0', //
-    ]);
+      data.add([
+        'Missed',
+        performanceCount['testDriveData']?.toString() ?? '0',
+        allIndiaBestPerformace['testDrivesCount']?.toString() ?? '0',
+        dealershipRank['testDrivesRank']?.toString() ?? '0',
+      ]);
 
-    // Add New Orders row
-    data.add([
-      'Rejected',
-      performanceCount['orders']?.toString() ?? '0', //performance
-      allIndiaBestPerformace['newOrdersCount']?.toString() ??
-          '0', //allIndiaRank
-      dealershipRank['newOrdersRank']?.toString() ?? '0', //
-    ]);
+      data.add([
+        'Rejected',
+        performanceCount['orders']?.toString() ?? '0',
+        allIndiaBestPerformace['newOrdersCount']?.toString() ?? '0',
+        dealershipRank['newOrdersRank']?.toString() ?? '0',
+      ]);
+    } else {
+      // Cold calls data - adjust field names as per your API response for cold calls
+      data.add([
+        'All Calls',
+        performanceCount['coldCalls']?.toString() ?? '0',
+        allIndiaBestPerformace['coldCallsCount']?.toString() ?? '0',
+        dealershipRank['coldCallsRank']?.toString() ?? '0',
+      ]);
+
+      data.add([
+        'Connected',
+        performanceCount['connectedCalls']?.toString() ?? '0',
+        allIndiaBestPerformace['connectedCallsCount']?.toString() ?? '0',
+        dealershipRank['connectedCallsRank']?.toString() ?? '0',
+      ]);
+
+      data.add([
+        'Missed',
+        performanceCount['missedCalls']?.toString() ?? '0',
+        allIndiaBestPerformace['missedCallsCount']?.toString() ?? '0',
+        dealershipRank['missedCallsRank']?.toString() ?? '0',
+      ]);
+
+      data.add([
+        'Rejected',
+        performanceCount['rejectedCalls']?.toString() ?? '0',
+        allIndiaBestPerformace['rejectedCallsCount']?.toString() ?? '0',
+        dealershipRank['rejectedCallsRank']?.toString() ?? '0',
+      ]);
+    }
 
     return data;
   }
@@ -213,7 +281,7 @@ class _CallAnalyticsState extends State<CallAnalytics> {
           ),
         ),
         title: Text(
-          'Call Ananlytitics',
+          'Call Analytics',
           style: GoogleFonts.poppins(
             fontSize: 18,
             fontWeight: FontWeight.w400,
@@ -224,18 +292,20 @@ class _CallAnalyticsState extends State<CallAnalytics> {
         automaticallyImplyLeading: false,
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              _buildTimeFilterRow(),
-              _buildUserStatsCard(),
-              const SizedBox(height: 16),
-              _buildCallsSummary(),
-              const SizedBox(height: 16),
-              _buildHourlyAnalysis(),
-            ],
-          ),
-        ),
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
+                child: Column(
+                  children: [
+                    _buildTimeFilterRow(),
+                    _buildUserStatsCard(),
+                    const SizedBox(height: 16),
+                    _buildCallsSummary(),
+                    const SizedBox(height: 16),
+                    _buildHourlyAnalysis(),
+                  ],
+                ),
+              ),
       ),
     );
   }
@@ -400,7 +470,6 @@ class _CallAnalyticsState extends State<CallAnalytics> {
         children: [
           _buildTabBar(),
           const SizedBox(height: 10),
-          // _buildCallsTable(),
           _buildAnalyticsTable(),
         ],
       ),
@@ -427,12 +496,70 @@ class _CallAnalyticsState extends State<CallAnalytics> {
     );
   }
 
+  Widget _buildAnalyticsTable() {
+    if (_isLoading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(20.0),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    return _buildTableContent();
+  }
+
+  Widget _buildTableContent() {
+    double screenWidth = MediaQuery.of(context).size.width;
+
+    return Table(
+      defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+      border: TableBorder(
+          horizontalInside: BorderSide(
+            color: Colors.grey.withOpacity(0.3),
+            width: 0.5,
+          ),
+          verticalInside: BorderSide.none),
+      columnWidths: {
+        0: FixedColumnWidth(screenWidth * 0.3), // Metric
+        1: FixedColumnWidth(screenWidth * 0.19), // Calls
+        2: FixedColumnWidth(screenWidth * 0.19), // Duration
+        3: FixedColumnWidth(screenWidth * 0.19), // Unique client
+      },
+      children: [
+        TableRow(
+          children: [
+            const SizedBox(), // Empty cell
+            Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                child: Text(
+                    textAlign: TextAlign.start,
+                    'Calls',
+                    style: AppFont.smallText10(context))),
+            Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              child: Text('Duration',
+                  textAlign: TextAlign.start,
+                  style: AppFont.smallText10(context)),
+            ),
+            Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                child: Text(
+                    textAlign: TextAlign.start,
+                    'Unique client',
+                    style: AppFont.smallText10(context))),
+          ],
+        ),
+        ...tableData.map((row) => _buildTableRow(row)).toList(),
+      ],
+    );
+  }
+
   Widget _buildTab(String label, bool isActive, int index) {
     return GestureDetector(
       onTap: () => _updateSelectedTab(index),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 5),
-        // margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 5),
         decoration: BoxDecoration(
           color: isActive ? Colors.blue : Colors.transparent,
           borderRadius: BorderRadius.circular(18),
@@ -469,16 +596,10 @@ class _CallAnalyticsState extends State<CallAnalytics> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Hourly Analysis',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 16),
+          Text('Hourly Analysis', style: AppFont.dropDowmLabel(context)),
+          const SizedBox(height: 10),
           _buildCallStatsRows(),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
           SizedBox(
             height: 240,
             child: _buildCombinedBarChart(),
@@ -490,21 +611,23 @@ class _CallAnalyticsState extends State<CallAnalytics> {
 
   Widget _buildCallStatsRows() {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      // crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Left column - Call counts
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('20',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
-              _buildCallStatRow('All calls', '10', '6 min 39 secs'),
-              _buildCallStatRow('Incoming calls', '3', '3 min 02 secs'),
-              _buildCallStatRow('Outgoing calls', '3', '3 min 02 secs'),
-              _buildCallStatRow('Missed calls', '5', '02 secs'),
-            ],
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+                color: AppColors.backgroundLightGrey,
+                borderRadius: BorderRadius.circular(10)),
+            child: Column( 
+              children: [
+                _buildCallStatRow('All calls', '10', '6 min 39 secs'),
+                _buildCallStatRow('Incoming calls', '3', '3 min 02 secs'),
+                _buildCallStatRow('Outgoing calls', '3', '3 min 02 secs'),
+                _buildCallStatRow('Missed calls', '5', '02 secs'),
+              ],
+            ),
           ),
         ),
       ],
@@ -515,25 +638,13 @@ class _CallAnalyticsState extends State<CallAnalytics> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        // crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey.shade700,
-              ),
-            ),
+            child: Text(label, style: AppFont.smallText10(context)),
           ),
-          const SizedBox(width: 12),
-          Text(
-            count,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          // const SizedBox(width: 12),
+          Text(count, style: AppFont.smallText12(context)),
           const SizedBox(width: 12),
           Text(
             duration,
@@ -547,7 +658,7 @@ class _CallAnalyticsState extends State<CallAnalytics> {
     );
   }
 
-  // New combined chart method
+  // Combined chart method
   Widget _buildCombinedBarChart() {
     return Column(
       children: [
@@ -604,7 +715,6 @@ class _CallAnalyticsState extends State<CallAnalytics> {
         LineChartData(
           lineTouchData: LineTouchData(
             touchTooltipData: LineTouchTooltipData(
-              // tooltipBgColor: Colors.grey.shade800,
               getTooltipItems: (List<LineBarSpot> touchedSpots) {
                 return touchedSpots.map((spot) {
                   String callType = '';
@@ -657,7 +767,6 @@ class _CallAnalyticsState extends State<CallAnalytics> {
                       text = '';
                   }
                   return SideTitleWidget(
-                    // axisSide: meta.axisSide,
                     space: 8,
                     child: Text(text, style: style),
                     meta: meta,
@@ -674,7 +783,6 @@ class _CallAnalyticsState extends State<CallAnalytics> {
                     return const SizedBox();
                   }
                   return SideTitleWidget(
-                    // fitInside: ,
                     space: 8,
                     child: Text(
                       value.toInt().toString(),
@@ -794,57 +902,12 @@ class _CallAnalyticsState extends State<CallAnalytics> {
     );
   }
 
-  Widget _buildAnalyticsTable() {
-    double screenWidth = MediaQuery.of(context).size.width;
-
-    return Table(
-      defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-      border: TableBorder(
-          horizontalInside: BorderSide(
-            color: Colors.grey.withOpacity(0.3),
-            width: 0.5,
-          ),
-          verticalInside: BorderSide.none),
-      columnWidths: {
-        0: FixedColumnWidth(screenWidth * 0.3), // Metric
-        1: FixedColumnWidth(screenWidth * 0.19), // My
-        2: FixedColumnWidth(screenWidth * 0.19), // All India Best
-        3: FixedColumnWidth(screenWidth * 0.19), // Dealership
-      },
-      children: [
-        TableRow(
-          children: [
-            const SizedBox(), // Empty cell
-            Center(
-                child: Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    child: Text('Calls', style: AppFont.smallText10(context)))),
-            Center(
-                child: Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              child: Text('Duration',
-                  textAlign: TextAlign.center,
-                  style: AppFont.smallText10(context)),
-            )),
-            Center(
-                child: Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    child: Text('Unique client',
-                        style: AppFont.smallText10(context)))),
-          ],
-        ),
-        ...tableData.map((row) => _buildTableRow(row)).toList(),
-      ],
-    );
-  }
-
   TableRow _buildTableRow(List<String> values) {
     return TableRow(
       children: values.map((value) {
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 5.0),
           child: Row(children: [
-            // Icon(Icon , ),
             Text(
               value,
               style: AppFont.smallText(context),

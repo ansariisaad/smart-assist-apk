@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart'; 
+import 'package:flutter/material.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:percent_indicator/percent_indicator.dart'; // For progress bars
 import 'package:get/get.dart';
@@ -154,6 +154,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           icon: const Icon(
             Icons.keyboard_arrow_left_rounded,
             color: Colors.white,
+            size: 40,
           ),
         ),
         title: Text('Profile', style: AppFont.appbarfontWhite(context)),
@@ -172,17 +173,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: Stack(
                         alignment: Alignment.center,
                         children: [
-                          CircleAvatar(
-                            radius: 60,
-                            backgroundImage: _profileImage != null
-                                ? FileImage(_profileImage!)
-                                : (profilePic != null && profilePic!.isNotEmpty
-                                        ? NetworkImage(profilePic!)
-                                        : const Icon(Icons.person))
-                                    as ImageProvider,
-                          ), 
-                          if (_isUploading)
-                            const CircularProgressIndicator(), 
+                          // Fixed CircleAvatar - this was causing the grey screen
+                          _profileImage != null
+                              ? CircleAvatar(
+                                  radius: 60,
+                                  backgroundImage: FileImage(_profileImage!),
+                                )
+                              : (profilePic != null && profilePic!.isNotEmpty
+                                  ? CircleAvatar(
+                                      radius: 60,
+                                      backgroundImage:
+                                          NetworkImage(profilePic!),
+                                    )
+                                  : CircleAvatar(
+                                      radius: 60,
+                                      backgroundColor: Colors.grey[300],
+                                      child: Icon(
+                                        Icons.person,
+                                        size: 60,
+                                        color: Colors.grey[700],
+                                      ),
+                                    )),
+                          if (_isUploading) const CircularProgressIndicator(),
                         ],
                       ),
                     ),
@@ -380,32 +392,4 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ];
     }
   }
-
-  // List<Color> _getGradientForProgress(double percentage) {
-  //   if (percentage >= 0.8) {
-  //     return [
-  //       Color.fromRGBO(255, 237, 215, 0.9),
-  //       Color.fromRGBO(83, 157, 243, 1),
-  //       Color.fromRGBO(144, 109, 250, 1),
-  //     ];
-  //   } else if (percentage >= 0.6) {
-  //     return [
-  //       Color.fromRGBO(254, 221, 176, 1),
-  //       Color.fromRGBO(144, 109, 250, 1),
-  //       Color.fromRGBO(255, 237, 215, 0.9),
-  //     ];
-  //   } else if (percentage >= 0.5) {
-  //     return [
-  //       Color.fromRGBO(229, 208, 210, 1),
-  //       Color.fromRGBO(255, 150, 165, 1),
-  //       Color.fromRGBO(255, 122, 113, 1),
-  //     ];
-  //   } else {
-  //     return [
-  //       Color.fromRGBO(182, 247, 249, 1),
-  //       Color.fromRGBO(168, 230, 251, 1),
-  //       Color.fromRGBO(196, 201, 255, 1),
-  //     ];
-  //   }
-  // }
 }
