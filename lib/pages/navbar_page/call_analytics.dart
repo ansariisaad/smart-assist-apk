@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:smart_assist/config/component/color/colors.dart';
 import 'package:smart_assist/config/component/font/font.dart';
@@ -39,8 +38,7 @@ class _CallAnalyticsState extends State<CallAnalytics>
       if (_tabController.indexIsChanging == false) {
         setState(() {
           selectedTabIndex = _tabController.index;
-          // Refresh data when tab changes
-          _fetchDashboardData();
+          // No need to fetch data again as we already have both tab data
         });
       }
     });
@@ -63,20 +61,20 @@ class _CallAnalyticsState extends State<CallAnalytics>
 
       // Determine period parameter based on selection
       String periodParam = '';
-      switch (_childButtonIndex) {
-        case 1:
+      switch (selectedTimeRange) {
+        case '1D':
           periodParam = '?type=DAY';
           break;
-        case 2:
-          periodParam = '?type=Week';
+        case '1W':
+          periodParam = '?type=WEEK';
           break;
-        case 3:
+        case '1M':
           periodParam = '?type=MTD';
           break;
-        case 4:
+        case '1Q':
           periodParam = '?type=QTD';
           break;
-        case 5:
+        case '1Y':
           periodParam = '?type=YTD';
           break;
         default:
@@ -102,13 +100,9 @@ class _CallAnalyticsState extends State<CallAnalytics>
         // Check if the widget is still in the widget tree before calling setState
         if (mounted) {
           setState(() {
-            _dashboardData = jsonData['data']; 
-            // Store data based on the selected tab
-            if (selectedTabIndex == 0) {
-              _enquiryData = jsonData['data']['summaryEnquiry'];
-            } else {
-              _coldCallData = jsonData['data']['summaryColdCalls'];
-            }
+            _dashboardData = jsonData['data'];
+            _enquiryData = jsonData['data']['summaryEnquiry'];
+            _coldCallData = jsonData['data']['summaryColdCalls'];
             _isLoading = false;
           });
         }
@@ -148,112 +142,210 @@ class _CallAnalyticsState extends State<CallAnalytics>
     setState(() {
       selectedTabIndex = index;
       _tabController.animateTo(index);
-      // No need to fetch data here as the tab controller listener will handle it
     });
   }
 
-  // Get current data based on selected tab and period
-  Map<String, dynamic> get performanceCount {
-    if (_dashboardData == null) {
-      // Return empty data if API data isn't available yet
-      return {};
-    }
-    return _dashboardData!['performance'] ?? {};
-  }
-
-  Map<String, dynamic> get currentAllIndiaRank {
-    if (_dashboardData == null) {
-      // Return empty data if API data isn't available yet
-      return {};
-    }
-    return _dashboardData!['allIndiaRank'] ?? {};
-  }
-
-  Map<String, dynamic> get allIndiaBestPerformace {
-    if (_dashboardData == null) {
-      // Return empty data if API data isn't available yet
-      return {};
-    }
-    return _dashboardData!['allIndiaBestPerformace'] ?? {};
-  }
-
-  Map<String, dynamic> get dealershipRank {
+  // Get current data based on selected tab
+  Map<String, dynamic> get currentTabData {
     if (_dashboardData == null) {
       return {};
     }
-    return _dashboardData!['dealerShipRank'] ?? {};
+    return selectedTabIndex == 0 ? _enquiryData ?? {} : _coldCallData ?? {};
   }
 
-  // Generate dynamic table rows based on API data and selected tab
-  List<List<String>> get tableData {
-    final List<List<String>> data = [];
-
-    if (_dashboardData == null) {
-      return [];
+  // Get summary data based on selected tab
+  Map<String, dynamic> get summarySectionData {
+    if (currentTabData.isEmpty) {
+      return {};
     }
+    return currentTabData['summary'] ?? {};
+  }
 
-    if (selectedTabIndex == 0) {
-      // Enquiry data
-      data.add([
-        'All Calls',
-        performanceCount['enquiry']?.toString() ?? '0',
-        allIndiaBestPerformace['enquiriesCount']?.toString() ?? '0',
-        dealershipRank['enquiriesRank']?.toString() ?? '0',
-      ]);
-
-      data.add([
-        'Connected',
-        performanceCount['lostEnq']?.toString() ?? '0',
-        allIndiaBestPerformace['lostEnquiriesCount']?.toString() ?? '0',
-        dealershipRank['lostEnquiriesRank']?.toString() ?? '0',
-      ]);
-
-      data.add([
-        'Missed',
-        performanceCount['testDriveData']?.toString() ?? '0',
-        allIndiaBestPerformace['testDrivesCount']?.toString() ?? '0',
-        dealershipRank['testDrivesRank']?.toString() ?? '0',
-      ]);
-
-      data.add([
-        'Rejected',
-        performanceCount['orders']?.toString() ?? '0',
-        allIndiaBestPerformace['newOrdersCount']?.toString() ?? '0',
-        dealershipRank['newOrdersRank']?.toString() ?? '0',
-      ]);
-    } else {
-      // Cold calls data - adjust field names as per your API response for cold calls
-      data.add([
-        'All Calls',
-        performanceCount['coldCalls']?.toString() ?? '0',
-        allIndiaBestPerformace['coldCallsCount']?.toString() ?? '0',
-        dealershipRank['coldCallsRank']?.toString() ?? '0',
-      ]);
-
-      data.add([
-        'Connected',
-        performanceCount['connectedCalls']?.toString() ?? '0',
-        allIndiaBestPerformace['connectedCallsCount']?.toString() ?? '0',
-        dealershipRank['connectedCallsRank']?.toString() ?? '0',
-      ]);
-
-      data.add([
-        'Missed',
-        performanceCount['missedCalls']?.toString() ?? '0',
-        allIndiaBestPerformace['missedCallsCount']?.toString() ?? '0',
-        dealershipRank['missedCallsRank']?.toString() ?? '0',
-      ]);
-
-      data.add([
-        'Rejected',
-        performanceCount['rejectedCalls']?.toString() ?? '0',
-        allIndiaBestPerformace['rejectedCallsCount']?.toString() ?? '0',
-        dealershipRank['rejectedCallsRank']?.toString() ?? '0',
-      ]);
+  // Get hourly analysis data based on selected tab
+  Map<String, dynamic> get hourlyAnalysisData {
+    if (currentTabData.isEmpty) {
+      return {};
     }
+    return currentTabData['hourlyAnalysis'] ?? {};
+  }
+
+  // Generate table rows based on API data for the selected tab
+  List<List<Widget>> get tableData {
+    List<List<Widget>> data = [];
+    final summary = summarySectionData;
+
+    // Always show these rows even if data is empty
+    // Add All Calls row
+    data.add([
+      const Row(
+        children: [
+          Icon(Icons.call, size: 16, color: Colors.blue),
+          SizedBox(width: 6),
+          Text('All Calls'),
+        ],
+      ),
+      Text(summary.containsKey('All Calls')
+          ? summary['All Calls']['calls']?.toString() ?? '0'
+          : '0'),
+      Text(summary.containsKey('All Calls')
+          ? summary['All Calls']['duration']?.toString() ?? '0'
+          : '0'),
+      Text(summary.containsKey('All Calls')
+          ? summary['All Calls']['uniqueClients']?.toString() ?? '0'
+          : '0'),
+    ]);
+
+    // Add Connected row
+    data.add([
+      const Row(
+        children: [
+          Icon(Icons.call, size: 16, color: Colors.green),
+          SizedBox(width: 6),
+          Text('Connected'),
+        ],
+      ),
+      Text(summary.containsKey('Connected')
+          ? summary['Connected']['calls']?.toString() ?? '0'
+          : '0'),
+      Text(summary.containsKey('Connected')
+          ? summary['Connected']['duration']?.toString() ?? '0'
+          : '0'),
+      Text(summary.containsKey('Connected')
+          ? summary['Connected']['uniqueClients']?.toString() ?? '0'
+          : '0'),
+    ]);
+
+    // Add Missed row
+    data.add([
+      const Row(
+        children: [
+          Icon(Icons.call_missed, size: 16, color: Colors.redAccent),
+          SizedBox(width: 6),
+          Text('Missed'),
+        ],
+      ),
+      Text(summary.containsKey('Missed')
+          ? summary['Missed']['calls']?.toString() ?? '0'
+          : '0'),
+      Text(summary.containsKey('Missed')
+          ? summary['Missed']['duration']?.toString() ?? '0'
+          : '0'),
+      Text(summary.containsKey('Missed')
+          ? summary['Missed']['uniqueClients']?.toString() ?? '0'
+          : '0'),
+    ]);
+
+    // Add Rejected row
+    data.add([
+      const Row(
+        children: [
+          Icon(Icons.call_missed_outgoing_rounded,
+              size: 16, color: Colors.redAccent),
+          SizedBox(width: 6),
+          Text('Rejected'),
+        ],
+      ),
+      Text(summary.containsKey('Rejected')
+          ? summary['Rejected']['calls']?.toString() ?? '0'
+          : '0'),
+      Text(summary.containsKey('Rejected')
+          ? summary['Rejected']['duration']?.toString() ?? '0'
+          : '0'),
+      Text(summary.containsKey('Rejected')
+          ? summary['Rejected']['uniqueClients']?.toString() ?? '0'
+          : '0'),
+    ]);
 
     return data;
   }
+  // List<List<Widget>> get tableData {
+  //   // final List<List<String>> data = [];
+  //   List<List<Widget>> data = [];
+
+  //   final summary = summarySectionData;
+
+  //   if (summary.isEmpty) return [];
+
+  //   // Add All Calls row
+  //   if (summary.containsKey('All Calls')) {
+  //     data.add([
+  //       // 'All Calls',
+  //       const Row(
+  //         children: [
+  //           Icon(Icons.call, size: 16, color: Colors.blue),
+  //           SizedBox(width: 6),
+  //           Text('All Calls'),
+  //         ],
+  //       ),
+  //       Text(summary['All Calls']['calls']?.toString() ?? '0'),
+  //       Text(summary['All Calls']['duration']?.toString() ?? '0'),
+  //       Text(summary['All Calls']['uniqueClients']?.toString() ?? '0'),
+  //     ]);
+  //   }
+
+  //   // Add Connected row
+  //   if (summary.containsKey('Connected')) {
+  //     data.add([
+  //       const Row(
+  //         children: [
+  //           Icon(Icons.call, size: 16, color: Colors.green),
+  //           SizedBox(width: 6),
+  //           Text('Connected'),
+  //         ],
+  //       ),
+  //       // 'Connected',
+  //       // summary['Connected']['calls']?.toString() ?? '0',
+  //       // summary['Connected']['duration']?.toString() ?? '0',
+  //       // summary['Connected']['uniqueClients']?.toString() ?? '0',
+  //       Text(summary['All Calls']['calls']?.toString() ?? '0'),
+  //       Text(summary['All Calls']['duration']?.toString() ?? '0'),
+  //       Text(summary['All Calls']['uniqueClients']?.toString() ?? '0'),
+  //     ]);
+  //   }
+
+  //   // Add Missed row
+  //   if (summary.containsKey('Missed')) {
+  //     data.add([
+  //       const Row(
+  //         children: [
+  //           Icon(Icons.call_missed, size: 16, color: Colors.redAccent),
+  //           SizedBox(width: 6),
+  //           Text('Missed'),
+  //         ],
+  //       ),
+  //       // 'Missed',
+  //       // summary['Missed']['calls']?.toString() ?? '0',
+  //       // summary['Missed']['duration']?.toString() ?? '0',
+  //       // summary['Missed']['uniqueClients']?.toString() ?? '0',
+  //       Text(summary['All Calls']['calls']?.toString() ?? '0'),
+  //       Text(summary['All Calls']['duration']?.toString() ?? '0'),
+  //       Text(summary['All Calls']['uniqueClients']?.toString() ?? '0'),
+  //     ]);
+  //   }
+
+  //   // Add Rejected row if it exists in future API responses
+  //   if (summary.containsKey('Rejected')) {
+  //     data.add([
+  //       const Row(
+  //         children: [
+  //           Icon(Icons.call_missed_outgoing_rounded,
+  //               size: 16, color: Colors.redAccent),
+  //           SizedBox(width: 6),
+  //           Text('Rejected'),
+  //         ],
+  //       ),
+  //       Text(summary['All Calls']['calls']?.toString() ?? '0'),
+  //       Text(summary['All Calls']['duration']?.toString() ?? '0'),
+  //       Text(summary['All Calls']['uniqueClients']?.toString() ?? '0'),
+  //       // 'Rejected',
+  //       // summary['Rejected']['calls']?.toString() ?? '0',
+  //       // summary['Rejected']['duration']?.toString() ?? '0',
+  //       // summary['Rejected']['uniqueClients']?.toString() ?? '0',
+  //     ]);
+  //   }
+
+  //   return data;
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -285,7 +377,7 @@ class _CallAnalyticsState extends State<CallAnalytics>
             : SingleChildScrollView(
                 child: Column(
                   children: [
-                    _buildTimeFilterRow(),
+                    _buildTabBar(),
                     _buildUserStatsCard(),
                     const SizedBox(height: 16),
                     _buildCallsSummary(),
@@ -302,12 +394,13 @@ class _CallAnalyticsState extends State<CallAnalytics>
     final timeRanges = ['1D', '1W', '1M', '1Q', '1Y'];
 
     return Padding(
-      padding: const EdgeInsets.only(top: 10, bottom: 10),
+      padding: const EdgeInsets.only(top: 5, bottom: 10),
       child: Align(
         alignment: Alignment.centerLeft,
         child: Container(
-          margin: const EdgeInsets.only(left: 15),
+          margin: const EdgeInsets.only(left: 0),
           width: 200,
+          // height: 30,
           decoration: BoxDecoration(
             color: AppColors.backgroundLightGrey,
             borderRadius: BorderRadius.circular(22),
@@ -352,8 +445,8 @@ class _CallAnalyticsState extends State<CallAnalytics>
 
   Widget _buildUserStatsCard() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(horizontal: 10),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
@@ -368,6 +461,7 @@ class _CallAnalyticsState extends State<CallAnalytics>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          _buildTimeFilterRow(),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -389,13 +483,17 @@ class _CallAnalyticsState extends State<CallAnalytics>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildStatBox('4', 'Total\nConnected', Colors.green, Icons.call),
+              _buildStatBox(currentTabData['totalConnected']?.toString() ?? '0',
+                  'Total\nConnected', Colors.green, Icons.call),
               _buildVerticalDivider(50),
               _buildStatBox(
-                  '13M', 'Conversation\ntime', Colors.blue, Icons.access_time),
+                  currentTabData['conversationTime']?.toString() ?? '0',
+                  'Conversation\ntime',
+                  Colors.blue,
+                  Icons.access_time),
               _buildVerticalDivider(50),
-              _buildStatBox(
-                  '3', 'Not\nConnected', Colors.red, Icons.call_missed),
+              _buildStatBox(currentTabData['notConnected']?.toString() ?? '0',
+                  'Not\nConnected', Colors.red, Icons.call_missed),
             ],
           ),
         ],
@@ -449,15 +547,15 @@ class _CallAnalyticsState extends State<CallAnalytics>
 
   Widget _buildCallsSummary() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 10),
+      padding: EdgeInsets.zero,
+      margin: EdgeInsets.zero,
       decoration: BoxDecoration(
         border: Border.all(color: Colors.grey.shade300),
+        // border: Border.all(color: AppColors.sideRed),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         children: [
-          _buildTabBar(),
-          const SizedBox(height: 10),
           _buildAnalyticsTable(),
         ],
       ),
@@ -468,7 +566,7 @@ class _CallAnalyticsState extends State<CallAnalytics>
     return Container(
       height: 30,
       padding: EdgeInsets.zero,
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: AppColors.backgroundLightGrey,
         borderRadius: BorderRadius.circular(22),
@@ -488,7 +586,7 @@ class _CallAnalyticsState extends State<CallAnalytics>
     if (_isLoading) {
       return const Center(
         child: Padding(
-          padding: EdgeInsets.all(20.0),
+          padding: EdgeInsets.all(10.0),
           child: CircularProgressIndicator(),
         ),
       );
@@ -505,33 +603,39 @@ class _CallAnalyticsState extends State<CallAnalytics>
       border: TableBorder(
           horizontalInside: BorderSide(
             color: Colors.grey.withOpacity(0.3),
-            width: 0.5,
+            width: 0.6,
           ),
           verticalInside: BorderSide.none),
       columnWidths: {
-        0: FixedColumnWidth(screenWidth * 0.3), // Metric
-        1: FixedColumnWidth(screenWidth * 0.19), // Calls
-        2: FixedColumnWidth(screenWidth * 0.19), // Duration
-        3: FixedColumnWidth(screenWidth * 0.19), // Unique client
+        0: FixedColumnWidth(screenWidth * 0.33), // Metric
+        1: FixedColumnWidth(screenWidth * 0.20), // Calls
+        2: FixedColumnWidth(screenWidth * 0.20), // Duration
+        3: FixedColumnWidth(screenWidth * 0.20), // Unique client
       },
       children: [
         TableRow(
           children: [
             const SizedBox(), // Empty cell
             Container(
-                margin: const EdgeInsets.only(bottom: 10),
+                margin: const EdgeInsets.only(
+                  bottom: 10,
+                  top: 10,
+                ),
                 child: Text(
                     textAlign: TextAlign.start,
                     'Calls',
                     style: AppFont.smallText10(context))),
             Container(
-              margin: const EdgeInsets.only(bottom: 10),
+              margin: const EdgeInsets.only(
+                bottom: 10,
+                top: 10,
+              ),
               child: Text('Duration',
                   textAlign: TextAlign.start,
                   style: AppFont.smallText10(context)),
             ),
             Container(
-                margin: const EdgeInsets.only(bottom: 10),
+                margin: const EdgeInsets.only(bottom: 10, top: 10, right: 5),
                 child: Text(
                     textAlign: TextAlign.start,
                     'Unique client',
@@ -567,8 +671,8 @@ class _CallAnalyticsState extends State<CallAnalytics>
 
   Widget _buildHourlyAnalysis() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(horizontal: 10),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border.all(color: Colors.grey.shade300),
@@ -589,7 +693,7 @@ class _CallAnalyticsState extends State<CallAnalytics>
           _buildCallStatsRows(),
           const SizedBox(height: 10),
           SizedBox(
-            height: 240,
+            height: 200,
             child: _buildCombinedBarChart(),
           ),
         ],
@@ -598,10 +702,37 @@ class _CallAnalyticsState extends State<CallAnalytics>
   }
 
   Widget _buildCallStatsRows() {
+    // Calculate totals from hourly analysis data
+    int allCalls = 0;
+    String allCallsDuration = "0m";
+    int incomingCalls = 0;
+    String incomingDuration = "0m";
+    // int outgoingCalls = 0;
+    // String outgoingDuration = "0m";
+    int missedCalls = 0;
+    String missedDuration = "";
+
+    // Sum up the calls and durations from hourly data
+    hourlyAnalysisData.forEach((hour, data) {
+      if (data['AllCalls'] != null) {
+        allCalls += (data['AllCalls']['calls'] as num?)?.toInt() ?? 0;
+        allCallsDuration = data['AllCalls']['duration'] ?? "0m";
+      }
+
+      // Connected calls (treating as incoming for now)
+      if (data['connected'] != null) {
+        incomingCalls += (data['connected']['calls'] as num?)?.toInt() ?? 0;
+        incomingDuration = data['connected']['duration']?.toString() ?? "0m";
+      }
+
+      // Missed calls
+      if (data['missedCalls'] != null) {
+        missedCalls = data['missedCalls'] as int;
+      }
+    });
+
     return Row(
-      // crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Left column - Call counts
         Expanded(
           child: Container(
             padding: const EdgeInsets.all(10),
@@ -610,10 +741,12 @@ class _CallAnalyticsState extends State<CallAnalytics>
                 borderRadius: BorderRadius.circular(10)),
             child: Column(
               children: [
-                _buildCallStatRow('All calls', '10', '6 min 39 secs'),
-                _buildCallStatRow('Incoming calls', '3', '3 min 02 secs'),
-                _buildCallStatRow('Outgoing calls', '3', '3 min 02 secs'),
-                _buildCallStatRow('Missed calls', '5', '02 secs'),
+                _buildCallStatRow(
+                    'All calls', allCalls.toString(), allCallsDuration),
+                _buildCallStatRow(
+                    'Connected', incomingCalls.toString(), incomingDuration),
+                _buildCallStatRow(
+                    'Missed calls', missedCalls.toString(), missedDuration),
               ],
             ),
           ),
@@ -626,12 +759,10 @@ class _CallAnalyticsState extends State<CallAnalytics>
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
-        // crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
             child: Text(label, style: AppFont.smallText10(context)),
           ),
-          // const SizedBox(width: 12),
           Text(count, style: AppFont.smallText12(context)),
           const SizedBox(width: 12),
           Text(
@@ -697,8 +828,73 @@ class _CallAnalyticsState extends State<CallAnalytics>
   }
 
   Widget _buildCombinedLineChart() {
+    // Process hourly analysis data to create chart spots
+    final List<FlSpot> allCallSpots = [];
+    final List<FlSpot> connectedSpots = [];
+    final List<FlSpot> missedSpots = [];
+
+    // Process data to create chart spots
+    // Sort keys to ensure hours are in order
+    final List<int> sortedHours =
+        hourlyAnalysisData.keys.map((e) => int.parse(e)).toList()..sort();
+
+    for (int i = 0; i < sortedHours.length; i++) {
+      final hour = sortedHours[i].toString();
+      final data = hourlyAnalysisData[hour];
+
+      if (data != null) {
+        final double xValue = i.toDouble() * 2; // Spread out the x values
+
+        // All calls
+        if (data['AllCalls'] != null) {
+          allCallSpots
+              .add(FlSpot(xValue, (data['AllCalls']['calls'] ?? 0).toDouble()));
+        }
+
+        // Connected calls
+        if (data['connected'] != null) {
+          connectedSpots.add(
+              FlSpot(xValue, (data['connected']['calls'] ?? 0).toDouble()));
+        }
+
+        // Missed calls
+        if (data['missedCalls'] != null) {
+          missedSpots
+              .add(FlSpot(xValue, (data['missedCalls'] as int).toDouble()));
+        }
+      }
+    }
+
+    // If no data points, create default ones
+    if (allCallSpots.isEmpty) {
+      allCallSpots.add(const FlSpot(0, 0));
+      allCallSpots.add(const FlSpot(2, 0));
+    }
+    if (connectedSpots.isEmpty) {
+      connectedSpots.add(const FlSpot(0, 0));
+      connectedSpots.add(const FlSpot(2, 0));
+    }
+    if (missedSpots.isEmpty) {
+      missedSpots.add(const FlSpot(0, 0));
+      missedSpots.add(const FlSpot(2, 0));
+    }
+
+    // Find max Y value for the chart
+    double maxY = 0;
+    for (var spot in [...allCallSpots, ...connectedSpots, ...missedSpots]) {
+      if (spot.y > maxY) maxY = spot.y;
+    }
+    maxY = maxY < 5 ? 5 : (maxY.ceil() + 2); // Add some padding to the max Y
+
+    // Find max X value
+    double maxX = 0;
+    for (var spot in [...allCallSpots, ...connectedSpots, ...missedSpots]) {
+      if (spot.x > maxX) maxX = spot.x;
+    }
+    maxX = maxX < 2 ? 12 : maxX + 2; // Ensure minimum width and add padding
+
     return Padding(
-      padding: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.only(top: 10),
       child: LineChart(
         LineChartData(
           lineTouchData: LineTouchData(
@@ -709,9 +905,9 @@ class _CallAnalyticsState extends State<CallAnalytics>
                   if (spot.barIndex == 0) {
                     callType = 'All Calls';
                   } else if (spot.barIndex == 1) {
-                    callType = 'Incoming';
+                    callType = 'Connected';
                   } else {
-                    callType = 'Outgoing';
+                    callType = 'Missed';
                   }
                   return LineTooltipItem(
                     '$callType: ${spot.y.toInt()} calls',
@@ -727,40 +923,32 @@ class _CallAnalyticsState extends State<CallAnalytics>
               sideTitles: SideTitles(
                 showTitles: true,
                 getTitlesWidget: (double value, TitleMeta meta) {
-                  const style = TextStyle(
+                  // Use hourly analysis keys for X axis
+                  final int index = value ~/ 2;
+                  final style = TextStyle(
                     color: Colors.grey,
                     fontSize: 10,
                   );
-                  String text;
-                  switch (value.toInt()) {
-                    case 0:
-                      text = '9:00';
-                      break;
-                    case 2:
-                      text = '10:00';
-                      break;
-                    case 4:
-                      text = '11:00';
-                      break;
-                    case 6:
-                      text = '12:00';
-                      break;
-                    case 8:
-                      text = '13:00';
-                      break;
-                    case 10:
-                      text = '14:00';
-                      break;
-                    default:
-                      text = '';
+
+                  if (index < sortedHours.length) {
+                    // Convert 24-hour to 12-hour format
+                    int hour = sortedHours[index];
+                    String period = hour >= 12 ? 'PM' : 'AM';
+                    hour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+                    return SideTitleWidget(
+                      space: 8,
+                      child: Text('$hour$period', style: style),
+                      meta: meta,
+                    );
                   }
                   return SideTitleWidget(
                     space: 8,
-                    child: Text(text, style: style),
+                    child: Text('', style: style),
                     meta: meta,
                   );
                 },
                 reservedSize: 28,
+                interval: 2,
               ),
             ),
             leftTitles: AxisTitles(
@@ -783,7 +971,7 @@ class _CallAnalyticsState extends State<CallAnalytics>
                   );
                 },
                 reservedSize: 28,
-                interval: 5,
+                interval: maxY > 10 ? 5 : 1,
               ),
             ),
             topTitles: const AxisTitles(
@@ -800,7 +988,7 @@ class _CallAnalyticsState extends State<CallAnalytics>
             show: true,
             drawHorizontalLine: true,
             drawVerticalLine: true,
-            horizontalInterval: 5,
+            horizontalInterval: maxY > 10 ? 5 : 1,
             verticalInterval: 2,
             getDrawingHorizontalLine: (value) {
               return FlLine(
@@ -817,21 +1005,13 @@ class _CallAnalyticsState extends State<CallAnalytics>
             },
           ),
           minX: 0,
-          maxX: 12,
+          maxX: maxX,
           minY: 0,
-          maxY: 15,
+          maxY: maxY,
           lineBarsData: [
             // All Calls Line
             LineChartBarData(
-              spots: const [
-                FlSpot(0, 5),
-                FlSpot(2, 3),
-                FlSpot(4, 7),
-                FlSpot(6, 8),
-                FlSpot(8, 9),
-                FlSpot(10, 11),
-                FlSpot(12, 12),
-              ],
+              spots: allCallSpots,
               isCurved: true,
               color: Colors.blue,
               barWidth: 3,
@@ -842,17 +1022,9 @@ class _CallAnalyticsState extends State<CallAnalytics>
                 color: Colors.blue.withOpacity(0.2),
               ),
             ),
-            // Incoming Calls Line
+            // Connected Calls Line
             LineChartBarData(
-              spots: const [
-                FlSpot(0, 2),
-                FlSpot(2, 1),
-                FlSpot(4, 4),
-                FlSpot(6, 3),
-                FlSpot(8, 5),
-                FlSpot(10, 6),
-                FlSpot(12, 7),
-              ],
+              spots: connectedSpots,
               isCurved: true,
               color: Colors.green,
               barWidth: 3,
@@ -863,17 +1035,9 @@ class _CallAnalyticsState extends State<CallAnalytics>
                 color: Colors.green.withOpacity(0.2),
               ),
             ),
-            // Outgoing Calls Line
+            // Missed Calls Line (using orange for the outgoing slot)
             LineChartBarData(
-              spots: const [
-                FlSpot(0, 3),
-                FlSpot(2, 2),
-                FlSpot(4, 3),
-                FlSpot(6, 5),
-                FlSpot(8, 4),
-                FlSpot(10, 5),
-                FlSpot(12, 5),
-              ],
+              spots: missedSpots,
               isCurved: true,
               color: Colors.orange,
               barWidth: 3,
@@ -890,21 +1054,31 @@ class _CallAnalyticsState extends State<CallAnalytics>
     );
   }
 
-  TableRow _buildTableRow(List<String> values) {
+  // TableRow _buildTableRow(List<String> values) {
+  //   return TableRow(
+  //     children: values.map((value) {
+  //       return Padding(
+  //         padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 5.0),
+  //         child: Row(children: [
+  //           Text(
+  //             value,
+  //             style: AppFont.smallText(context),
+  //             textAlign: values.indexOf(value) == 0
+  //                 ? TextAlign.left
+  //                 : TextAlign.center,
+  //             overflow: TextOverflow.ellipsis,
+  //           ),
+  //         ]),
+  //       );
+  //     }).toList(),
+  //   );
+  // }
+  TableRow _buildTableRow(List<Widget> widgets) {
     return TableRow(
-      children: values.map((value) {
+      children: widgets.map((widget) {
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 5.0),
-          child: Row(children: [
-            Text(
-              value,
-              style: AppFont.smallText(context),
-              textAlign: values.indexOf(value) == 0
-                  ? TextAlign.left
-                  : TextAlign.center,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ]),
+          child: widget, // Use the widget directly here
         );
       }).toList(),
     );

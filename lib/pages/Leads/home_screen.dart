@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:call_log/call_log.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -71,6 +72,10 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoadingSearch = false;
   // final NavigationController controller = Get.put(NavigationController());
   String _query = '';
+
+  // exit popup
+  DateTime? _lastBackPressTime;
+  final int _exitTimeInMillis = 2000;
 
   // Initialize the controller
   final FabController fabController = Get.put(FabController());
@@ -389,185 +394,189 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      excludeFromSemantics: true,
-      onTap: () => FocusScope.of(context).unfocus(),
-      child: Stack(children: [
-        Scaffold(
-          backgroundColor: Colors.white,
-          appBar: AppBar(
-            automaticallyImplyLeading: false,
-            backgroundColor: const Color(0xFF1380FE),
-            title: Text(
-              ' $greeting',
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                fontWeight: FontWeight.w400,
-                color: Colors.white,
+    return WillPopScope(
+      onWillPop: _onWillPop,
+      child: GestureDetector(
+        excludeFromSemantics: true,
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Stack(children: [
+          Scaffold(
+            backgroundColor: Colors.white,
+            appBar: AppBar(
+              automaticallyImplyLeading: false,
+              backgroundColor: const Color(0xFF1380FE),
+              title: Text(
+                ' $greeting',
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                  color: Colors.white,
+                ),
               ),
-            ),
-            actions: [
-              Stack(
-                children: [
-                  IconButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => const NotificationPage()),
-                      );
-                    },
-                    icon: const Icon(Icons.notifications),
-                    color: Colors.white,
-                  ),
-                  if (notificationCount > 0)
-                    Positioned(
-                      right: 8,
-                      top: 5,
-                      child: Container(
-                        padding: const EdgeInsets.all(1),
-                        decoration: const BoxDecoration(
-                          color: AppColors.sideRed,
-                          shape: BoxShape.circle,
-                        ),
-                        constraints: const BoxConstraints(
-                          minWidth: 15,
-                          minHeight: 15,
-                          maxWidth: 20,
-                          maxHeight: 20,
-                        ),
-                        child: Text(
-                          notificationCount.toString(),
-                          style: GoogleFonts.poppins(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w400,
+              actions: [
+                Stack(
+                  children: [
+                    IconButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const NotificationPage()),
+                        );
+                      },
+                      icon: const Icon(Icons.notifications),
+                      color: Colors.white,
+                    ),
+                    if (notificationCount > 0)
+                      Positioned(
+                        right: 8,
+                        top: 5,
+                        child: Container(
+                          padding: const EdgeInsets.all(1),
+                          decoration: const BoxDecoration(
+                            color: AppColors.sideRed,
+                            shape: BoxShape.circle,
                           ),
-                          textAlign: TextAlign.center,
+                          constraints: const BoxConstraints(
+                            minWidth: 15,
+                            minHeight: 15,
+                            maxWidth: 20,
+                            maxHeight: 20,
+                          ),
+                          child: Text(
+                            notificationCount.toString(),
+                            style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w400,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
                         ),
                       ),
-                    ),
-                ],
-              )
-            ],
-          ),
-          body: Stack(children: [
-            SafeArea(
-              child: RefreshIndicator(
-                onRefresh: onrefreshToggle,
-                child: isDashboardLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : SingleChildScrollView(
-                        keyboardDismissBehavior:
-                            ScrollViewKeyboardDismissBehavior.onDrag,
-                        child: Column(
-                          children: [
-                            // const SizedBox(height: 5),
+                  ],
+                )
+              ],
+            ),
+            body: Stack(children: [
+              SafeArea(
+                child: RefreshIndicator(
+                  onRefresh: onrefreshToggle,
+                  child: isDashboardLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : SingleChildScrollView(
+                          keyboardDismissBehavior:
+                              ScrollViewKeyboardDismissBehavior.onDrag,
+                          child: Column(
+                            children: [
+                              // const SizedBox(height: 5),
 
-                            /// ✅ Row with Menu, Search Bar, and Microphone
-                            Row(
-                              children: [
-                                // Container(
-                                //   width: 40,
-                                //   height: 40,
-                                //   padding: const EdgeInsets.symmetric(
-                                //       vertical: 0, horizontal: 0),
-                                //   margin: const EdgeInsets.all(8),
-                                //   decoration: BoxDecoration(
-                                //       // shape: BoxShape.circle,
-                                //       color: AppColors.backgroundLightGrey,
-                                //       borderRadius: BorderRadius.circular(30)),
-                                //   child: TextButton(
-                                //     style: const ButtonStyle(
-                                //       minimumSize:
-                                //           WidgetStatePropertyAll(Size.zero),
-                                //       tapTargetSize:
-                                //           MaterialTapTargetSize.shrinkWrap,
-                                //       padding: WidgetStatePropertyAll(
-                                //           EdgeInsets.zero),
-                                //     ),
-                                //     onPressed: () {
-                                //       Navigator.push(
-                                //           context,
-                                //           MaterialPageRoute(
-                                //               builder: (context) =>
-                                //                   const ProfileScreen()));
-                                //     },
-                                //     child: Text(
-                                //       name.isNotEmpty ? name : 'NA',
-                                //       style:
-                                //           AppFont.mediumText14bluebold(context),
-                                //     ),
-                                //   ),
-                                // ),
+                              /// ✅ Row with Menu, Search Bar, and Microphone
+                              Row(
+                                children: [
+                                  // Container(
+                                  //   width: 40,
+                                  //   height: 40,
+                                  //   padding: const EdgeInsets.symmetric(
+                                  //       vertical: 0, horizontal: 0),
+                                  //   margin: const EdgeInsets.all(8),
+                                  //   decoration: BoxDecoration(
+                                  //       // shape: BoxShape.circle,
+                                  //       color: AppColors.backgroundLightGrey,
+                                  //       borderRadius: BorderRadius.circular(30)),
+                                  //   child: TextButton(
+                                  //     style: const ButtonStyle(
+                                  //       minimumSize:
+                                  //           WidgetStatePropertyAll(Size.zero),
+                                  //       tapTargetSize:
+                                  //           MaterialTapTargetSize.shrinkWrap,
+                                  //       padding: WidgetStatePropertyAll(
+                                  //           EdgeInsets.zero),
+                                  //     ),
+                                  //     onPressed: () {
+                                  //       Navigator.push(
+                                  //           context,
+                                  //           MaterialPageRoute(
+                                  //               builder: (context) =>
+                                  //                   const ProfileScreen()));
+                                  //     },
+                                  //     child: Text(
+                                  //       name.isNotEmpty ? name : 'NA',
+                                  //       style:
+                                  //           AppFont.mediumText14bluebold(context),
+                                  //     ),
+                                  //   ),
+                                  // ),
 
-                                Expanded(
-                                  child: Container(
-                                    margin: const EdgeInsets.symmetric(
-                                        horizontal: 10, vertical: 10),
-                                    child: SizedBox(
-                                      height: 35,
-                                      child: TextField(
-                                        readOnly: true,
-                                        onTap: () {
-                                          Get.to(() => const GlobalSearch());
-                                        },
-                                        textAlignVertical:
-                                            TextAlignVertical.center,
-                                        decoration: InputDecoration(
-                                          enabledBorder: OutlineInputBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(30),
-                                            borderSide: BorderSide.none,
-                                          ),
-                                          contentPadding: EdgeInsets.zero,
-                                          filled: true,
-                                          fillColor: AppColors.containerBg,
-                                          hintText: 'Search',
-                                          hintStyle: GoogleFonts.poppins(
-                                            fontSize: 14,
-                                            color: AppColors.fontColor,
-                                            fontWeight: FontWeight.w400,
-                                          ),
-                                          prefixIcon: const Icon(
-                                            FontAwesomeIcons.magnifyingGlass,
-                                            color: AppColors.iconGrey,
-                                            size: 15,
-                                          ),
-                                          border: OutlineInputBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(30),
-                                            borderSide: BorderSide.none,
-                                          ),
-                                          suffixIcon: Padding(
-                                            padding: const EdgeInsets.symmetric(
-                                                vertical: 2),
-                                            child: GestureDetector(
-                                              onTap: () {
-                                                Navigator.push(
-                                                  context,
-                                                  MaterialPageRoute(
-                                                    builder: (context) =>
-                                                        const ProfileScreen(),
+                                  Expanded(
+                                    child: Container(
+                                      margin: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 10),
+                                      child: SizedBox(
+                                        height: 35,
+                                        child: TextField(
+                                          readOnly: true,
+                                          onTap: () {
+                                            Get.to(() => const GlobalSearch());
+                                          },
+                                          textAlignVertical:
+                                              TextAlignVertical.center,
+                                          decoration: InputDecoration(
+                                            enabledBorder: OutlineInputBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(30),
+                                              borderSide: BorderSide.none,
+                                            ),
+                                            contentPadding: EdgeInsets.zero,
+                                            filled: true,
+                                            fillColor: AppColors.containerBg,
+                                            hintText: 'Search',
+                                            hintStyle: GoogleFonts.poppins(
+                                              fontSize: 14,
+                                              color: AppColors.fontColor,
+                                              fontWeight: FontWeight.w400,
+                                            ),
+                                            prefixIcon: const Icon(
+                                              FontAwesomeIcons.magnifyingGlass,
+                                              color: AppColors.iconGrey,
+                                              size: 15,
+                                            ),
+                                            border: OutlineInputBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(30),
+                                              borderSide: BorderSide.none,
+                                            ),
+                                            suffixIcon: Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      vertical: 2),
+                                              child: GestureDetector(
+                                                onTap: () {
+                                                  Navigator.push(
+                                                    context,
+                                                    MaterialPageRoute(
+                                                      builder: (context) =>
+                                                          const ProfileScreen(),
+                                                    ),
+                                                  );
+                                                },
+                                                child: Container(
+                                                  width: 40,
+                                                  height: 40,
+                                                  decoration: BoxDecoration(
+                                                    color: AppColors
+                                                        .backgroundLightGrey,
+                                                    shape: BoxShape.circle,
                                                   ),
-                                                );
-                                              },
-                                              child: Container(
-                                                width: 40,
-                                                height: 40,
-                                                decoration: BoxDecoration(
-                                                  color: AppColors
-                                                      .backgroundLightGrey,
-                                                  shape: BoxShape.circle,
-                                                ),
-                                                alignment: Alignment.center,
-                                                child: Text(
-                                                  name.isNotEmpty
-                                                      ? name.toUpperCase()
-                                                      : 'N',
-                                                  style: AppFont
-                                                      .mediumText14bluebold(
-                                                          context),
+                                                  alignment: Alignment.center,
+                                                  child: Text(
+                                                    name.isNotEmpty
+                                                        ? name.toUpperCase()
+                                                        : 'N',
+                                                    style: AppFont
+                                                        .mediumText14bluebold(
+                                                            context),
+                                                  ),
                                                 ),
                                               ),
                                             ),
@@ -576,82 +585,82 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ),
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
-
-                            /// ✅ Other UI Components (Follow-ups, Buttons, etc.)
-                            // const SizedBox(height: 3),
-                            Threebtn(
-                              leadId: leadId ?? 'empty',
-                              upcomingFollowups: upcomingFollowups,
-                              overdueFollowups: overdueFollowups,
-                              upcomingAppointments: upcomingAppointments,
-                              overdueAppointments: overdueAppointments,
-                              upcomingTestDrives: upcomingTestDrives,
-                              overdueTestDrives: overdueTestDrives,
-                              refreshDashboard: fetchDashboardData,
-                              overdueFollowupsCount: overdueFollowupsCount,
-                              overdueAppointmentsCount:
-                                  overdueAppointmentsCount,
-                              overdueTestDrivesCount: overdueTestDrivesCount,
-                            ),
-                            const BottomBtnSecond(
-                                // MtdData: MtdData,
-                                // QtdData: QtdData,
-                                // YtdData: YtdData,
-                                ),
-
-                            Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 10.0),
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    'Performance analysis',
-                                    style: AppFont.appbarfontgrey(context),
-                                  ),
-                                  TextButton(
-                                      onPressed: () {
-                                        setState(() {
-                                          _isHidden = !_isHidden;
-                                        });
-                                      },
-                                      child: Text(
-                                        _isHidden ? 'Show' : 'Hide',
-                                        style: AppFont.smallText(context),
-                                      ))
                                 ],
                               ),
-                            ),
-                            if (!_isHidden) ...[
-                              const BottomBtnThird(),
+
+                              /// ✅ Other UI Components (Follow-ups, Buttons, etc.)
+                              // const SizedBox(height: 3),
+                              Threebtn(
+                                leadId: leadId ?? 'empty',
+                                upcomingFollowups: upcomingFollowups,
+                                overdueFollowups: overdueFollowups,
+                                upcomingAppointments: upcomingAppointments,
+                                overdueAppointments: overdueAppointments,
+                                upcomingTestDrives: upcomingTestDrives,
+                                overdueTestDrives: overdueTestDrives,
+                                refreshDashboard: fetchDashboardData,
+                                overdueFollowupsCount: overdueFollowupsCount,
+                                overdueAppointmentsCount:
+                                    overdueAppointmentsCount,
+                                overdueTestDrivesCount: overdueTestDrivesCount,
+                              ),
+                              const BottomBtnSecond(
+                                  // MtdData: MtdData,
+                                  // QtdData: QtdData,
+                                  // YtdData: YtdData,
+                                  ),
+
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10.0),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Performance analysis',
+                                      style: AppFont.appbarfontgrey(context),
+                                    ),
+                                    TextButton(
+                                        onPressed: () {
+                                          setState(() {
+                                            _isHidden = !_isHidden;
+                                          });
+                                        },
+                                        child: Text(
+                                          _isHidden ? 'Show' : 'Hide',
+                                          style: AppFont.smallText(context),
+                                        ))
+                                  ],
+                                ),
+                              ),
+                              if (!_isHidden) ...[
+                                const BottomBtnThird(),
+                              ],
+
+                              const SizedBox(
+                                height: 10,
+                              )
                             ],
-
-                            const SizedBox(
-                              height: 10,
-                            )
-                          ],
+                          ),
                         ),
-                      ),
+                ),
               ),
-            ),
 
-            Positioned(
-              bottom: 26,
-              right: 18,
-              child: _buildFloatingActionButton(context),
-            ),
+              Positioned(
+                bottom: 26,
+                right: 18,
+                child: _buildFloatingActionButton(context),
+              ),
 
-            // Popup Menu (Conditionally Rendered)
-            Obx(() => fabController.isFabExpanded.value
-                ? _buildPopupMenu(context)
-                : const SizedBox.shrink()),
-          ]),
-        ),
-      ]),
+              // Popup Menu (Conditionally Rendered)
+              Obx(() => fabController.isFabExpanded.value
+                  ? _buildPopupMenu(context)
+                  : const SizedBox.shrink()),
+            ]),
+          ),
+        ]),
+      ),
     );
   }
 
@@ -838,6 +847,122 @@ class _HomeScreenState extends State<HomeScreen> {
 
 //   );
 // }
+ 
+// Add this method to handle back button press
+  Future<bool> _onWillPop() async {
+    final now = DateTime.now();
+    if (_lastBackPressTime == null ||
+        now.difference(_lastBackPressTime!) >
+            Duration(milliseconds: _exitTimeInMillis)) {
+      _lastBackPressTime = now;
 
-// ✅ Function to Show `CreateFollowupsPopups` on "Lead"
+      // Show a bottom slide dialog
+      showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.transparent,
+        builder: (BuildContext context) {
+          return Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 10,
+                  spreadRadius: 0,
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 20),
+                Text(
+                  'Exit App',
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.colorsBlue,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Are you sure you want to exit?',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                    color: Colors.black54,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Row(
+                    children: [
+                      // Cancel button (White)
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.pop(context); // Dismiss dialog
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: AppColors.colorsBlue,
+                            side:const BorderSide(color: AppColors.colorsBlue),
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: Text(
+                            'Cancel',
+                            style: GoogleFonts.poppins(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 15),
+                      // Exit button (Blue)
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            SystemNavigator.pop(); // Exit the app
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.colorsBlue,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: Text(
+                            'Exit',
+                            style: GoogleFonts.poppins(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 25),
+              ],
+            ),
+          );
+        },
+      );
+      return false;
+    }
+    return true;
+  }
 }
