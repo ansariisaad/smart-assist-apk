@@ -65,7 +65,7 @@ class _CallAnalyticsState extends State<CallAnalytics>
       String periodParam = '';
       switch (_childButtonIndex) {
         case 1:
-          periodParam = '?type=Day';
+          periodParam = '?type=DAY';
           break;
         case 2:
           periodParam = '?type=Week';
@@ -80,21 +80,11 @@ class _CallAnalyticsState extends State<CallAnalytics>
           periodParam = '?type=YTD';
           break;
         default:
-          periodParam = '?type=Day';
+          periodParam = '?type=DAY';
       }
 
-      // Add tab parameter to differentiate between "Summary-Enquiry" and "Summary-Cold Calls"
-      String tabParam =
-          selectedTabIndex == 0 ? '&tab=enquiry' : '&tab=coldcall';
-
-      // If periodParam already contains a query parameter, append tabParam with &, otherwise use ?
-      final separator = periodParam.contains('?') ? '&' : '?';
-      final fullParams = periodParam.isEmpty
-          ? '?tab=${selectedTabIndex == 0 ? "enquiry" : "coldcall"}'
-          : periodParam + tabParam;
-
       final uri = Uri.parse(
-          'https://dev.smartassistapp.in/api/users/dashboard/analytics$fullParams');
+          'https://dev.smartassistapp.in/api/users/ps/dashboard/call-analytics$periodParam');
 
       final response = await http.get(
         uri,
@@ -112,15 +102,13 @@ class _CallAnalyticsState extends State<CallAnalytics>
         // Check if the widget is still in the widget tree before calling setState
         if (mounted) {
           setState(() {
-            _dashboardData = jsonData['data'];
-
+            _dashboardData = jsonData['data']; 
             // Store data based on the selected tab
             if (selectedTabIndex == 0) {
-              _enquiryData = jsonData['data'];
+              _enquiryData = jsonData['data']['summaryEnquiry'];
             } else {
-              _coldCallData = jsonData['data'];
+              _coldCallData = jsonData['data']['summaryColdCalls'];
             }
-
             _isLoading = false;
           });
         }
@@ -620,7 +608,7 @@ class _CallAnalyticsState extends State<CallAnalytics>
             decoration: BoxDecoration(
                 color: AppColors.backgroundLightGrey,
                 borderRadius: BorderRadius.circular(10)),
-            child: Column( 
+            child: Column(
               children: [
                 _buildCallStatRow('All calls', '10', '6 min 39 secs'),
                 _buildCallStatRow('Incoming calls', '3', '3 min 02 secs'),

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:call_log/call_log.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:get/get.dart';
@@ -82,6 +83,12 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadDashboardAnalytics();
     _loadTeamRole();
     print(_loadTeamRole());
+    // uploadCallLogsAfterLogin();
+
+    // Or this alternative:
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      uploadCallLogsAfterLogin();
+    });
   }
 
   Future<void> _loadDashboardAnalytics() async {
@@ -115,6 +122,66 @@ class _HomeScreenState extends State<HomeScreen> {
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     super.dispose();
+  }
+
+// call log after login
+  Future<void> uploadCallLogsAfterLogin() async {
+    // Request permission
+    if (!await Permission.phone.isGranted) {
+      var status = await Permission.phone.request();
+      if (!status.isGranted) {
+        print('Permission denied');
+        return;
+      }
+    }
+
+    // Fetch call logs
+    Iterable<CallLogEntry> entries = await CallLog.get();
+    List<CallLogEntry> callLogs = entries.toList();
+
+    if (callLogs.isEmpty) {
+      print('No call logs to send');
+      return;
+    }
+
+    // Format logs
+    List<Map<String, dynamic>> formattedLogs = callLogs.map((log) {
+      return {
+        'name': log.name ?? 'Unknown',
+        'start_time': log.timestamp?.toString() ?? '',
+        'mobile': log.number ?? '',
+        'call_type': log.callType?.toString().split('.').last ?? '',
+        'call_duration': log.duration?.toString() ?? '',
+        'unique_key':
+            '${log.timestamp?.toString() ?? ''}${log.number ?? ''}${log.callType?.toString()}${log.duration?.toString()}',
+      };
+    }).toList();
+
+    // Send to API
+    final token = await Storage.getToken(); // Replace with your token logic
+    const apiUrl = 'https://dev.smartassistapp.in/api/leads/create-call-logs';
+
+    try {
+      final response = await http.post(
+        Uri.parse(apiUrl),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(formattedLogs),
+      );
+
+      if (response.statusCode == 201) {
+        print('Call logs uploaded successfully');
+
+        print('this is the response call log ${response.body}');
+      } else {
+        print('Failed: ${response.statusCode}');
+        print('Response: ${response.body}');
+      }
+    } catch (e) {
+      print('Upload error: $e');
+    }
   }
 
   Future<void> fetchDashboardData() async {
@@ -176,6 +243,11 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     }
+  }
+
+  Future<void> onrefreshToggle() async {
+    await fetchDashboardData();
+    await uploadCallLogsAfterLogin();
   }
 
   Future<void> _fetchSearchResults(String query) async {
@@ -382,7 +454,7 @@ class _HomeScreenState extends State<HomeScreen> {
           body: Stack(children: [
             SafeArea(
               child: RefreshIndicator(
-                onRefresh: fetchDashboardData,
+                onRefresh: onrefreshToggle,
                 child: isDashboardLoading
                     ? const Center(child: CircularProgressIndicator())
                     : SingleChildScrollView(

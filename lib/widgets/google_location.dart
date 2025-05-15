@@ -4,6 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
+import 'package:smart_assist/config/component/font/font.dart';
+
 class PlacePrediction {
   final String placeId;
   final String description;
@@ -120,7 +122,8 @@ class _CustomGooglePlacesFieldState extends State<CustomGooglePlacesField> {
                 color: Colors.black,
               ),
               children: [
-                TextSpan(text: widget.label),
+                TextSpan(
+                    text: widget.label, style: AppFont.dropDowmLabel(context)),
                 if (widget.isRequired)
                   const TextSpan(
                     text: " *",
@@ -130,7 +133,7 @@ class _CustomGooglePlacesFieldState extends State<CustomGooglePlacesField> {
             ),
           ),
         ),
-        const SizedBox(height: 5),
+        // const SizedBox(height: 5),
 
         // Input field
         // Container(

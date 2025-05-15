@@ -243,7 +243,8 @@ class BottomNavigation extends StatelessWidget {
               leading: const Icon(Icons.call_outlined, size: 28),
               title: Text('Call Analytics',
                   style: GoogleFonts.poppins(fontSize: 18)),
-              onTap: () => Get.to(() => const CallAnalytics()),
+              onTap: () => Get.to(() => const //CallLogs()
+                  CallAnalytics()),
             ),
             // if (teamRole == "Owner")
             //   ListTile(
