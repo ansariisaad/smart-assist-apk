@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -35,12 +36,19 @@ class _LeadUpdateState extends State<LeadUpdate> {
   bool _isListening = false;
   bool isSubmitting = false;
 
+  String? selectedVehicleName;
+  List<dynamic> vehicleList = [];
+  List<dynamic> _searchResults = [];
+  List<String> uniqueVehicleNames = [];
+
   // Form error tracking
   Map<String, String> _errors = {};
   bool _isLoadingSearch = false;
   String _selectedBrand = '';
   String _selectedEnquiryType = '';
   Map<String, dynamic>? _existingLeadData;
+  String _query = '';
+  final TextEditingController _searchController = TextEditingController();
 
   TextEditingController emailController = TextEditingController();
   TextEditingController nameController = TextEditingController();
@@ -54,7 +62,27 @@ class _LeadUpdateState extends State<LeadUpdate> {
     // Initialize speech recognition
     _speech = stt.SpeechToText();
     _initSpeech();
+    // _searchController.addListener(_onSearchChanged);
+    _searchController.addListener(() {
+      final query = _searchController.text.trim();
+      if (query.isNotEmpty) {
+        _debounceSearch(query);
+      } else {
+        setState(() {
+          _searchResults.clear();
+        });
+      }
+    });
     _fetchLeadData();
+  }
+
+  Timer? _debounce;
+
+  void _debounceSearch(String query) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 400), () {
+      fetchVehicleData(query); // ← call your controller/API fetch function here
+    });
   }
 
   // Initialize speech recognition
@@ -79,6 +107,72 @@ class _LeadUpdateState extends State<LeadUpdate> {
       showErrorMessage(context,
           message: 'Speech recognition not available on this device');
     }
+  }
+
+  Future<void> fetchVehicleData(String query) async {
+    if (query.isEmpty) {
+      setState(() {
+        _searchResults = [];
+        _isLoadingSearch = false;
+      });
+      return;
+    }
+
+    final token = await Storage.getToken();
+
+    setState(() {
+      _isLoadingSearch = true;
+    });
+
+    try {
+      final response = await http.get(
+        Uri.parse(
+          'https://dev.smartassistapp.in/api/search/vehicles?vehicle=${Uri.encodeComponent(query)}',
+        ),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(response.body);
+        final List<dynamic> results = data['data']['suggestions'] ?? [];
+
+        final Set<String> seenNames = {};
+        final List<dynamic> uniqueResults = [];
+
+        for (var vehicle in results) {
+          final name = vehicle['vehicle_name'];
+          if (name != null && seenNames.add(name)) {
+            uniqueResults.add(vehicle);
+          }
+        }
+
+        setState(() {
+          _searchResults = uniqueResults;
+        });
+      } else {
+        print("Failed to load data: ${response.statusCode}");
+      }
+    } catch (e) {
+      print("Error fetching data: $e");
+    } finally {
+      setState(() {
+        _isLoadingSearch = false;
+      });
+    }
+  }
+
+  void _onSearchChanged(String query) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      if (query.isNotEmpty) {
+        fetchVehicleData(query);
+      } else {
+        setState(() => _searchResults.clear());
+      }
+    });
   }
 
   // Fetch lead data by ID to populate the form
@@ -481,6 +575,7 @@ class _LeadUpdateState extends State<LeadUpdate> {
                                   });
                                 }),
                             const SizedBox(height: 15),
+                            // _buildSearchField(),
                             _buildTextField(
                                 label: 'Primary Model Interest',
                                 controller: modelInterestController,
@@ -556,6 +651,114 @@ class _LeadUpdateState extends State<LeadUpdate> {
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _buildSearchField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 10),
+        Text('Primary Model Interest', style: AppFont.dropDowmLabel(context)),
+        const SizedBox(height: 5),
+        Container(
+          height: MediaQuery.of(context).size.height * 0.055,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(5),
+            color: AppColors.containerBg,
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (value) {
+                    // 🔁 Call your search API when the user types
+                    _onSearchChanged(value);
+                  },
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: AppColors.containerBg,
+                    hintText: selectedVehicleName ?? 'Vehicle Name',
+                    hintStyle: TextStyle(
+                      color: selectedVehicleName != null
+                          ? Colors.black
+                          : Colors.grey,
+                    ),
+                    prefixIcon: const Icon(
+                      FontAwesomeIcons.magnifyingGlass,
+                      size: 15,
+                      color: AppColors.iconGrey,
+                    ),
+                    contentPadding:
+                        const EdgeInsets.symmetric(vertical: 0, horizontal: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(5),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (_isLoadingSearch)
+          const Padding(
+            padding: EdgeInsets.only(top: 8.0),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+        if (_searchResults.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(top: 8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(5),
+              boxShadow: const [
+                BoxShadow(color: Colors.black12, blurRadius: 4)
+              ],
+            ),
+            child: ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _searchResults.length,
+              itemBuilder: (context, index) {
+                final result = _searchResults[index];
+                return ListTile(
+                  onTap: () {
+                    setState(() {
+                      FocusScope.of(context).unfocus();
+                      selectedVehicleName = result['vehicle_name'];
+
+                      selectedVehicleName = selectedVehicleName;
+                      modelInterestController.text =
+                          selectedVehicleName!; // ✅ This sets the controller
+
+                      _searchController.clear();
+                      _searchResults.clear();
+                    });
+                    // ✅ Fetch additional info if needed
+                    // fetchVehicleColors(result['vehicle_name']);
+                  },
+                  title: Text(
+                    result['vehicle_name'] ?? 'No Name',
+                    style: TextStyle(
+                      color: selectedVehicleName == result['vehicle_name']
+                          ? Colors.black
+                          : AppColors.fontBlack,
+                    ),
+                  ),
+                  leading: const Icon(Icons.directions_car),
+                );
+              },
+            ),
+          ),
+      ],
     );
   }
 
@@ -941,7 +1144,7 @@ class _LeadUpdateState extends State<LeadUpdate> {
         'mobile': mobileNumber,
         'brand': _selectedBrand,
         'sp_id': spId,
-        'PMI': modelInterestController.text,
+        'PMI': selectedVehicleName,
         'enquiry_type': _selectedEnquiryType,
       };
 

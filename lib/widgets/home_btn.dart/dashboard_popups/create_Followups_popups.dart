@@ -558,8 +558,8 @@ class _CreateFollowupsPopupsState extends State<CreateFollowupsPopups> {
               // options: ['Call', 'Provide Quotation', 'Send Email'],
               options: {
                 "Call": "Call",
-                // 'Provide quotation': "Provide Quotation",
-                // "Send Email": "Send Email",
+                'Provide quotation': "Provide Quotation",
+                "Send Email": "Send Email",
                 "Send SMS": "Send SMS"
               },
               groupValue: _selectedSubject,
@@ -600,9 +600,9 @@ class _CreateFollowupsPopupsState extends State<CreateFollowupsPopups> {
               height: 10,
             ),
             _buildTextField(
-                label: 'Comments:',
+                label: 'Remarks:',
                 controller: descriptionController,
-                hint: 'Add Comments'),
+                hint: 'Add remarks'),
             const SizedBox(height: 10),
             Row(
               children: [

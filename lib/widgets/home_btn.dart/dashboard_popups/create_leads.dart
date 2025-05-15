@@ -48,6 +48,7 @@ class _CreateLeadsState extends State<CreateLeads> {
   List<dynamic> _searchResultsColor = [];
   String? selectedColorName;
   String? selectedVehicleColorId;
+  String? selectedUrl;
   // String? selectedColormail;
 
   List<dynamic> _searchResults = [];
@@ -1499,14 +1500,16 @@ class _CreateLeadsState extends State<CreateLeads> {
               itemCount: _searchResultsColor.length,
               itemBuilder: (context, index) {
                 final result = _searchResultsColor[index];
+                final imageUrl = result['image_url'];
+
                 return ListTile(
                   onTap: () {
                     setState(() {
                       FocusScope.of(context).unfocus();
-                      // spId = result['user_id'];
                       selectedVehicleColorId = result['color_id'];
                       selectedColorName = result['color_name'];
-                      // selectedAssigneEmail = result['email'];
+                      selectedUrl =
+                          result['image_url']; // Save the selected URL
 
                       _searchControllerVehicleColor.clear();
                       _searchResultsColor.clear();
@@ -1520,16 +1523,52 @@ class _CreateLeadsState extends State<CreateLeads> {
                           : AppColors.fontBlack,
                     ),
                   ),
-                  // subtitle: Text(
-                  //   result['email'] ?? 'No Email',
-                  //   style: GoogleFonts.poppins(
-                  //     fontSize: 10,
-                  //     color: selectedColorName == result['user_id']
-                  //         ? Colors.black
-                  //         : AppColors.fontBlack,
-                  //   ),
-                  // ),
-                  leading: const Icon(Icons.invert_colors_rounded),
+                  leading: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.grey.shade200, // Fallback color
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: imageUrl != null && imageUrl.isNotEmpty
+                          ? Image.network(
+                              imageUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return const Center(
+                                  child: Icon(
+                                    Icons.error_outline,
+                                    color: Colors.grey,
+                                    size: 20,
+                                  ),
+                                );
+                              },
+                              loadingBuilder:
+                                  (context, child, loadingProgress) {
+                                if (loadingProgress == null) return child;
+                                return Center(
+                                  child: CircularProgressIndicator(
+                                    value: loadingProgress.expectedTotalBytes !=
+                                            null
+                                        ? loadingProgress
+                                                .cumulativeBytesLoaded /
+                                            loadingProgress.expectedTotalBytes!
+                                        : null,
+                                    strokeWidth: 2,
+                                  ),
+                                );
+                              },
+                            )
+                          : const Center(
+                              child: Icon(
+                                Icons.invert_colors_rounded,
+                                color: Colors.grey,
+                              ),
+                            ),
+                    ),
+                  ),
                 );
               },
             ),
@@ -2237,7 +2276,7 @@ class _CreateLeadsState extends State<CreateLeads> {
         'consent': consentValue,
         'budget': highestBudgetValue,
         'location': _locationController.text,
-        'color': selectedColorName 
+        'color': selectedColorName
       };
 
       print(
